@@ -20,7 +20,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Lint Dockerfile (hadolint)
         uses: hadolint/hadolint-action@v3.1.0
         with:
@@ -37,7 +37,7 @@ jobs:
       matrix:
         tag: [latest, version]     # version: the tag named in the VERSION file
     steps:
-      - uses: actions/checkout@v5  # needed so .trivyignore is honored
+      - uses: actions/checkout@v7  # needed so .trivyignore is honored
       - name: Log in to Harbor
         uses: docker/login-action@v3
         with:
