@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # latest/Dockerfile pins ubuntu and golang by digest, so a rebuild alone never picks up a fixed
+  # base image: the fix arrives here as a pull request, which pr.yml builds and tests. Before
+  # merging one, run `scripts/upstream.sh rebuild` on its branch: a changed image needs a new
+  # VERSION (docs/upstream-updates.md).
+  - package-ecosystem: docker
+    directory: /latest
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

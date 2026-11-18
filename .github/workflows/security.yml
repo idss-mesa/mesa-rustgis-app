@@ -1,0 +1,86 @@
+# Image security scanning for the mesa-rustgis CyVerse VICE image.
+# hadolint lints the Dockerfile on every PR (pr.yml is the gate; this run is
+# report-only); trivy scans the published Harbor images weekly + on demand (not
+# rebuilt per PR): :latest, and the tag in VERSION, which is the one DE tools
+# pin and users run. Report-only by default.
+name: security
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # 6h after harbor.yml's weekly rebuild so trivy scans the fresh image
+    - cron: '0 6 * * 0'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Lint Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: latest/Dockerfile
+          config: .hadolint.yaml
+          failure-threshold: warning
+          no-fail: true            # report-only — set false to gate the PR
+
+  scan:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: [latest, version]     # version: the tag named in the VERSION file
+    steps:
+      - uses: actions/checkout@v5  # needed so .trivyignore is honored
+      - name: Log in to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: harbor.cyverse.org
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+      # A tag Harbor answers "not found" for (before its first push) is skipped
+      # with a warning. Any other failure fails the job: an outage or a login
+      # problem must not pass as "nothing to scan". Until the Harbor secrets
+      # exist the login step above fails, which is the reminder to add them.
+      - name: Check the image is published
+        id: image
+        env:
+          TAG: ${{ matrix.tag }}
+        run: |
+          if [ "$TAG" = version ]; then TAG=$(cat VERSION); fi
+          ref="harbor.cyverse.org/vice/mesa-rustgis:$TAG"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          if out=$(docker buildx imagetools inspect "$ref" 2>&1); then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          elif grep -qiE 'not found|manifest unknown' <<<"$out"; then
+            echo "::warning::$ref is not published yet; skipping its scan"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$out" >&2
+            echo "::error::cannot tell whether $ref is published"
+            exit 1
+          fi
+      - name: Scan published image for CVEs (trivy)
+        if: steps.image.outputs.found == 'true'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0; SHA-pinned: tags were rewritten in the 2026-03 trivy-action compromise
+        with:
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'           # report-only — set '1' to gate on fixable findings
+        env:
+          TRIVY_TIMEOUT: 30m
+      - name: Upload results to the GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && steps.image.outputs.found == 'true'
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-${{ matrix.tag }}

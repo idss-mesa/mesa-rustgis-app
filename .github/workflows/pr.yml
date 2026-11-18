@@ -1,0 +1,61 @@
+name: pr
+
+# Pull-request check: server tests, lint, then the image build (which runs the server tests again)
+# and the smoke test. No secrets, nothing is pushed.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # In the Dockerfile's golang image, as root and as the image user (uid 1000).
+      - name: go vet and go test
+        run: make test-server
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Lint Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: latest/Dockerfile
+          config: .hadolint.yaml
+          failure-threshold: warning
+      - name: Lint shell scripts (shellcheck)
+        run: >-
+          shellcheck latest/inject.sh ci/test-cpu.sh ci/fixtures/make-data-store.sh
+          ci/fixtures/make-range-fixtures.sh scripts/upstream.sh scripts/push.sh
+      - name: DE definitions are valid JSON and name this version
+        run: |
+          v=$(cat VERSION)
+          fail=0
+          # same FILE JQ_FILTER — the two version fields of FILE must equal VERSION.
+          same() {
+            got=$(jq -r "$2" "$1") || got="not valid JSON"
+            if [ "$got" != "$v $v" ]; then
+              echo "::error file=$1::version fields are '$got', VERSION is '$v' (scripts/upstream.sh bump and rebuild set them)"
+              fail=1
+            fi
+          }
+          same de/tool.json '.version + " " + .container.image.tag'
+          for f in de/app*.json; do same "$f" '.version + " " + .tools[0].version'; done
+          exit "$fail"
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        run: make build
+      - name: Smoke test
+        run: make test

@@ -1,0 +1,619 @@
+/* Copyright The MESA RustGIS App authors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Data Store panel over the RustGIS canvas. Every selector starts with #rgis-host-root; nothing
+ * here styles html, body or the canvas. Contract: docs/architecture.md, section 6.
+ */
+
+#rgis-host-root {
+  --rgis-host-bg: #f6f7f9;
+  --rgis-host-raised: #ffffff;
+  --rgis-host-ink: #2b313b;
+  --rgis-host-muted: #5b6573;
+  --rgis-host-line: #d3d9e1;
+  --rgis-host-hover: #e9edf2;
+  --rgis-host-accent: #b9511a;
+  --rgis-host-accent-ink: #ffffff;
+  --rgis-host-select: #fbe9de;
+  --rgis-host-error: #a8261d;
+  --rgis-host-ok: #1d6b3a;
+  --rgis-host-shadow: 0 6px 28px rgba(20, 26, 34, 0.28);
+  --rgis-host-dock: 42;
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  color: var(--rgis-host-ink);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  #rgis-host-root {
+    --rgis-host-bg: #22272e;
+    --rgis-host-raised: #2b313b;
+    --rgis-host-ink: #e8ecf1;
+    --rgis-host-muted: #a3adba;
+    --rgis-host-line: #414a57;
+    --rgis-host-hover: #343c48;
+    --rgis-host-accent: #f0915c;
+    --rgis-host-accent-ink: #1d1410;
+    --rgis-host-select: #4a3528;
+    --rgis-host-error: #ff9a8f;
+    --rgis-host-ok: #7fd49b;
+    --rgis-host-shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+
+#rgis-host-root *,
+#rgis-host-root *::before,
+#rgis-host-root *::after {
+  box-sizing: border-box;
+}
+
+#rgis-host-root [hidden] {
+  display: none !important;
+}
+
+#rgis-host-root button,
+#rgis-host-root input {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+#rgis-host-root :focus-visible {
+  outline: 2px solid var(--rgis-host-accent);
+  outline-offset: 1px;
+}
+
+#rgis-host-root .rgis-host-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#rgis-host-root .rgis-host-icon-dir {
+  fill: currentColor;
+  fill-opacity: 0.18;
+  color: var(--rgis-host-accent);
+}
+
+/* ------------------------------------------------------------------ toggle */
+
+#rgis-host-root #rgis-host-toggle {
+  position: fixed;
+  right: 0;
+  top: clamp(8px, calc(var(--rgis-host-dock) * 1%), calc(100% - 8.5rem));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 5px 10px 6px;
+  border: 1px solid var(--rgis-host-line);
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  background: var(--rgis-host-raised);
+  box-shadow: 0 2px 10px rgba(20, 26, 34, 0.22);
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#rgis-host-root #rgis-host-toggle:hover {
+  background: var(--rgis-host-hover);
+}
+
+#rgis-host-root .rgis-host-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rgis-host-accent);
+}
+
+#rgis-host-root.rgis-host-busy .rgis-host-toggle-dot {
+  animation: rgis-host-pulse 1s ease-in-out infinite alternate;
+}
+
+#rgis-host-root.rgis-host-failed .rgis-host-toggle-dot {
+  background: var(--rgis-host-error);
+}
+
+/* The tab rides the drawer's edge while it is open, when there is room beside it. */
+@media (min-width: 540px) {
+  #rgis-host-root.rgis-host-open #rgis-host-toggle {
+    right: 480px;
+  }
+}
+
+@keyframes rgis-host-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.25; }
+}
+
+@keyframes rgis-host-slide {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes rgis-host-busy {
+  from { background-position: 0 0; }
+  to { background-position: 200% 0; }
+}
+
+/* ------------------------------------------------------------------ panel */
+
+#rgis-host-root #rgis-host-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 26, 34, 0.28);
+  pointer-events: auto;
+}
+
+#rgis-host-root #rgis-host-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--rgis-host-bg);
+  border-left: 1px solid var(--rgis-host-line);
+  box-shadow: var(--rgis-host-shadow);
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0;
+  pointer-events: auto;
+  outline: none;
+  animation: rgis-host-slide 0.16s ease-out;
+}
+
+#rgis-host-root .rgis-host-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 8px 14px;
+}
+
+#rgis-host-root .rgis-host-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+#rgis-host-root .rgis-host-user {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--rgis-host-muted);
+}
+
+#rgis-host-root .rgis-host-badge {
+  padding: 1px 7px;
+  border: 1px solid var(--rgis-host-line);
+  border-radius: 999px;
+  color: var(--rgis-host-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+#rgis-host-root .rgis-host-icon-btn {
+  display: inline-flex;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+#rgis-host-root .rgis-host-icon-btn:hover {
+  background: var(--rgis-host-hover);
+}
+
+#rgis-host-root #rgis-host-roots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+#rgis-host-root .rgis-host-root {
+  padding: 3px 10px;
+  border: 1px solid var(--rgis-host-line);
+  border-radius: 999px;
+  background: var(--rgis-host-raised);
+  cursor: pointer;
+}
+
+#rgis-host-root .rgis-host-root:hover:not(:disabled):not([aria-current]) {
+  background: var(--rgis-host-hover);
+}
+
+#rgis-host-root .rgis-host-root[aria-current] {
+  border-color: var(--rgis-host-accent);
+  background: var(--rgis-host-accent);
+  color: var(--rgis-host-accent-ink);
+}
+
+#rgis-host-root .rgis-host-root:disabled {
+  border-style: dashed;
+  background: transparent;
+  color: var(--rgis-host-muted);
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+#rgis-host-root .rgis-host-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--rgis-host-line);
+}
+
+#rgis-host-root #rgis-host-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+}
+
+#rgis-host-root .rgis-host-crumb {
+  max-width: 100%;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#rgis-host-root .rgis-host-crumb:hover {
+  background: var(--rgis-host-hover);
+}
+
+#rgis-host-root .rgis-host-crumb[aria-current] {
+  font-weight: 650;
+}
+
+#rgis-host-root .rgis-host-crumb-sep,
+#rgis-host-root .rgis-host-crumb-text {
+  color: var(--rgis-host-muted);
+}
+
+#rgis-host-root .rgis-host-input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--rgis-host-line);
+  border-radius: 6px;
+  background: var(--rgis-host-raised);
+}
+
+#rgis-host-root .rgis-host-input::placeholder {
+  color: var(--rgis-host-muted);
+  opacity: 1;
+}
+
+#rgis-host-root .rgis-host-input:disabled {
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------------ listing */
+
+#rgis-host-root .rgis-host-body {
+  flex: 1 1 0;
+  min-height: 96px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--rgis-host-raised);
+  border-top: 1px solid var(--rgis-host-line);
+  border-bottom: 1px solid var(--rgis-host-line);
+}
+
+#rgis-host-root #rgis-host-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  outline: none;
+}
+
+#rgis-host-root #rgis-host-list[aria-busy="true"] {
+  opacity: 0.55;
+}
+
+#rgis-host-root #rgis-host-list[aria-busy="true"]::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--rgis-host-accent), transparent) 0 0 / 200% 100%;
+  animation: rgis-host-busy 1s linear infinite;
+}
+
+#rgis-host-root .rgis-host-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+#rgis-host-root .rgis-host-row-main:hover {
+  background: var(--rgis-host-hover);
+}
+
+#rgis-host-root .rgis-host-row.rgis-host-selected .rgis-host-row-main {
+  background: var(--rgis-host-select);
+}
+
+#rgis-host-root .rgis-host-row-main:focus-visible,
+#rgis-host-root .rgis-host-row-main:focus-within {
+  outline: 2px solid var(--rgis-host-accent);
+  outline-offset: -2px;
+}
+
+#rgis-host-root .rgis-host-check {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--rgis-host-accent);
+  outline: none;
+}
+
+#rgis-host-root .rgis-host-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#rgis-host-root .rgis-host-meta {
+  flex: none;
+  color: var(--rgis-host-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#rgis-host-root .rgis-host-date {
+  width: 6.5em;
+  text-align: right;
+}
+
+#rgis-host-root .rgis-host-empty {
+  margin: 0;
+  padding: 28px 14px;
+  color: var(--rgis-host-muted);
+  text-align: center;
+}
+
+#rgis-host-root #rgis-host-more {
+  display: block;
+  margin: 8px auto 10px;
+}
+
+/* ------------------------------------------------------------------ buttons and tools */
+
+#rgis-host-root .rgis-host-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--rgis-host-line);
+  border-radius: 6px;
+  background: var(--rgis-host-raised);
+  color: var(--rgis-host-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#rgis-host-root .rgis-host-btn:hover {
+  background: var(--rgis-host-hover);
+}
+
+#rgis-host-root .rgis-host-btn.rgis-host-primary {
+  border-color: var(--rgis-host-accent);
+  background: var(--rgis-host-accent);
+  color: var(--rgis-host-accent-ink);
+  font-weight: 600;
+}
+
+#rgis-host-root .rgis-host-btn.rgis-host-primary:hover {
+  filter: brightness(1.08);
+}
+
+#rgis-host-root .rgis-host-btn:disabled,
+#rgis-host-root .rgis-host-btn[aria-disabled="true"] {
+  border-color: var(--rgis-host-line);
+  background: transparent;
+  color: var(--rgis-host-muted);
+  font-weight: 400;
+  opacity: 0.65;
+  filter: none;
+  cursor: not-allowed;
+}
+
+#rgis-host-root .rgis-host-btn.rgis-host-small {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+#rgis-host-root .rgis-host-tools {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+}
+
+#rgis-host-root .rgis-host-tools .rgis-host-input {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------------ uploads */
+
+#rgis-host-root #rgis-host-uploads {
+  flex: none;
+  max-height: 30%;
+  margin: 0;
+  padding: 0 14px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+#rgis-host-root .rgis-host-upload-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--rgis-host-line);
+}
+
+#rgis-host-root .rgis-host-upload-item .rgis-host-name {
+  font-weight: 600;
+}
+
+#rgis-host-root .rgis-host-upload-item progress {
+  grid-column: 1;
+  width: 100%;
+  height: 6px;
+  accent-color: var(--rgis-host-accent);
+}
+
+#rgis-host-root .rgis-host-upload-note {
+  grid-column: 1;
+  color: var(--rgis-host-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+#rgis-host-root .rgis-host-upload-buttons {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+#rgis-host-root .rgis-host-upload-item[data-state="failed"] .rgis-host-upload-note {
+  color: var(--rgis-host-error);
+}
+
+#rgis-host-root .rgis-host-upload-item[data-state="done"] .rgis-host-upload-note {
+  color: var(--rgis-host-ok);
+}
+
+#rgis-host-root .rgis-host-upload-item[data-state="ask"] .rgis-host-upload-note {
+  color: var(--rgis-host-ink);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+#rgis-host-root .rgis-host-footer {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--rgis-host-line);
+}
+
+#rgis-host-root .rgis-host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+#rgis-host-root .rgis-host-count {
+  margin-left: auto;
+  color: var(--rgis-host-muted);
+  font-size: 12px;
+}
+
+#rgis-host-root .rgis-host-note {
+  margin: 8px 0 0;
+  color: var(--rgis-host-muted);
+  font-size: 12px;
+}
+
+#rgis-host-root #rgis-host-status {
+  min-height: 1.4em;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+#rgis-host-root #rgis-host-status.rgis-host-status-error {
+  color: var(--rgis-host-error);
+  font-weight: 600;
+}
+
+#rgis-host-root #rgis-host-status.rgis-host-status-ok {
+  color: var(--rgis-host-ok);
+}
+
+#rgis-host-root #rgis-host-status .rgis-host-input {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------ drop target */
+
+#rgis-host-root .rgis-host-drop {
+  position: absolute;
+  inset: 6px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--rgis-host-accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--rgis-host-bg) 86%, transparent);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+#rgis-host-root .rgis-host-dropping .rgis-host-drop {
+  display: flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #rgis-host-root #rgis-host-panel,
+  #rgis-host-root.rgis-host-busy .rgis-host-toggle-dot,
+  #rgis-host-root #rgis-host-list[aria-busy="true"]::before {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  #rgis-host-root .rgis-host-row.rgis-host-selected .rgis-host-row-main {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
+}

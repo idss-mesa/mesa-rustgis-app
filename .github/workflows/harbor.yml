@@ -1,0 +1,61 @@
+name: harbor
+
+on:
+  push:
+    branches: main
+    paths:
+      - 'latest/**'
+      - 'patches/**'
+      - 'ci/**'
+      - 'VERSION'
+      - 'UPSTREAM_REF'
+      - 'Makefile'
+      - 'scripts/push.sh'
+      - '.github/workflows/harbor.yml'
+  schedule:
+    # Weekly rebuild: proves the pinned build still reproduces. The base images are pinned by
+    # digest, so this picks up no fixes; those arrive as dependabot PRs (.github/dependabot.yml).
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harbor
+  cancel-in-progress: false
+
+env:
+  IMAGE: harbor.cyverse.org/vice/mesa-rustgis
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # The build runs go vet and go test; a failure stops here.
+      - name: Build
+        run: make build
+
+      # Gate: nothing is pushed unless the image passes the smoke test.
+      - name: Smoke test
+        run: make test
+
+      - name: Login to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: harbor.cyverse.org
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      # DE tools pin :<VERSION>, so that tag is written once and never moved: to publish a changed
+      # image, raise VERSION. :latest follows every build. scripts/push.sh pushes :<VERSION> only
+      # when Harbor answers "not found" for it, and fails on any other answer.
+      - name: Push
+        run: make push
+
+      - name: Image digest
+        run: docker image inspect -f '{{join .RepoDigests "\n"}}' "$IMAGE:latest"

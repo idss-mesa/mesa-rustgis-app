@@ -1,0 +1,8 @@
+# Keeps repo metadata and editor cruft out of the image build context/layers.
+**/.git
+**/.github
+**/*.md
+**/LICENSE
+**/.gitignore
+**/.DS_Store
+**/*.swp

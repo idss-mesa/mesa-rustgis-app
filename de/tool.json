@@ -1,0 +1,35 @@
+{
+  "name": "mesa-rustgis",
+  "version": "0.6.0-1",
+  "description": "MESA RustGIS: the RustGIS web GIS (opengeos/RustGIS) with a CyVerse Data Store panel for browsing, opening and uploading data",
+  "type": "interactive",
+  "interactive": true,
+  "restricted": false,
+  "container": {
+    "image": {
+      "name": "harbor.cyverse.org/vice/mesa-rustgis",
+      "tag": "0.6.0-1"
+    },
+    "network_mode": "bridge",
+    "working_directory": "/home/rustgis/data-store",
+    "uid": 1000,
+    "skip_tmp_mount": true,
+    "pids_limit": 1024,
+    "min_cpu_cores": 1,
+    "max_cpu_cores": 2,
+    "min_memory_limit": 2147483648,
+    "memory_limit": 4294967296,
+    "min_disk_space": 10737418240,
+    "container_ports": [
+      {
+        "container_port": 8080
+      }
+    ],
+    "interactive_apps": {
+      "name": "cas-proxy",
+      "image": "discoenv/cas-proxy",
+      "cas_url": "https://olson.cyverse.org/cas",
+      "cas_validate": "validate"
+    }
+  }
+}

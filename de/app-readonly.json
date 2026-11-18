@@ -1,0 +1,35 @@
+{
+  "system_id": "de",
+  "name": "MESA RustGIS (read-only)",
+  "description": "RustGIS, a web GIS, with a read-only Data Store panel: browse and open data, with uploads and new folders turned off. For analyses you share with other people.",
+  "version": "0.6.0-1",
+  "tools": [
+    {
+      "id": "REPLACE_WITH_TOOL_ID",
+      "name": "mesa-rustgis",
+      "type": "interactive",
+      "version": "0.6.0-1",
+      "interactive": true
+    }
+  ],
+  "groups": [
+    {
+      "name": "settings",
+      "label": "Settings",
+      "isVisible": false,
+      "parameters": [
+        {
+          "name": "RGIS_READONLY",
+          "label": "Read-only Data Store",
+          "description": "Sets RGIS_READONLY=1 in the container, which refuses every write.",
+          "type": "EnvironmentVariable",
+          "defaultValue": "1",
+          "isVisible": false,
+          "required": false,
+          "omit_if_blank": false,
+          "order": 0
+        }
+      ]
+    }
+  ]
+}

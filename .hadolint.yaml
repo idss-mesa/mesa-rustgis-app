@@ -1,0 +1,8 @@
+# hadolint config for the mesa-rustgis VICE image.
+# Docs: https://github.com/hadolint/hadolint
+failure-threshold: warning
+ignored:
+  - DL3008  # pin apt versions — the base image is digest-pinned; apt packages track that release
+trustedRegistries:
+  - harbor.cyverse.org
+  - docker.io

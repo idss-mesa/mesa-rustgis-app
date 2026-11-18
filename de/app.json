@@ -1,0 +1,16 @@
+{
+  "system_id": "de",
+  "name": "MESA RustGIS",
+  "description": "RustGIS, a web GIS, with a Data Store panel: browse your CyVerse Data Store, open rasters, vectors and projects from it, and upload files from your computer.",
+  "version": "0.6.0-1",
+  "tools": [
+    {
+      "id": "REPLACE_WITH_TOOL_ID",
+      "name": "mesa-rustgis",
+      "type": "interactive",
+      "version": "0.6.0-1",
+      "interactive": true
+    }
+  ],
+  "groups": []
+}

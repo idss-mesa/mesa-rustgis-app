@@ -1,0 +1,47 @@
+MESA RustGIS App
+Copyright 2026 The MESA RustGIS App authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+It covers the files in this repository: the rgis-host file service, the Data
+Store overlay, the image definition, and the build, test and documentation
+files.
+
+------------------------------------------------------------------------------
+RustGIS
+------------------------------------------------------------------------------
+
+The container image built from this repository redistributes the web bundle of
+RustGIS (https://github.com/opengeos/RustGIS), which is licensed under the
+Apache License, Version 2.0, copyright its authors.
+
+The bundle is the release archive RustGIS-<version>-web.zip, published by the
+RustGIS project. The build downloads it, checks its SHA-256 against the value
+pinned in UPSTREAM_REF, and unpacks it to /opt/rustgis/app in the image. The
+pinned tag and commit are recorded in UPSTREAM_REF.
+
+The bundle is redistributed unmodified, with these two exceptions, both made
+at image build time:
+
+  1. index.html has one line inserted before </head>: a stylesheet link and a
+     script tag, each marked with the attribute data-rgis-host, that load the
+     Data Store overlay from /host/. Nothing else in the file is changed.
+  2. A gzip-compressed copy (<file>.gz) is stored beside each .wasm, .js,
+     .css, .html, .txt and .webmanifest file. The original files are kept.
+
+The bundle's own LICENSE and THIRD-PARTY-LICENSES.txt, which list the licenses
+of the components compiled into RustGIS, are kept in the image at
+/opt/rustgis/app/LICENSE and /opt/rustgis/app/THIRD-PARTY-LICENSES.txt and are
+served by the app at /LICENSE and /THIRD-PARTY-LICENSES.txt.
+
+This repository contains no RustGIS source code. "RustGIS" is the name of the
+upstream project; this project is not affiliated with or endorsed by it.
+
+------------------------------------------------------------------------------
+Other components in the image
+------------------------------------------------------------------------------
+
+rgis-host is compiled from the Go standard library only. Go is distributed
+under a BSD-style license (https://go.dev/LICENSE).
+
+The image is based on Ubuntu and includes tini (https://github.com/krallin/tini,
+MIT License). Their license texts are in the image under /usr/share/doc.
