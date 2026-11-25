@@ -7,7 +7,7 @@
 # zip: the unpatched upstream release bundle. src (M4): a patched source build.
 ARG RUSTGIS_SOURCE=zip
 
-FROM ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 AS base
+FROM ubuntu:26.04@sha256:d66b366dac61b575bee2aef07e9c26e8070096fbe84a3d4d3eb0da069b5d76db AS base
 
 # ---- web-zip: the upstream release bundle, checksum-verified, with the overlay tags injected ----
 FROM base AS web-zip
